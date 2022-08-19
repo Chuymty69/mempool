@@ -13,7 +13,7 @@ class LightningStatsImporter {
 
   async $run(): Promise<void> {
     const [channels]: any[] = await DB.query('SELECT short_id from channels;');
-    logger.info('Caching funding txs for currently existing channels');
+    logger.info(`${logger.tags.ln} Caching funding txs for currently existing channels`);
     await fundingTxFetcher.$fetchChannelsFundingTxs(channels.map(channel => channel.short_id));
 
     await this.$importHistoricalLightningStats();
@@ -74,7 +74,7 @@ class LightningStatsImporter {
 
       const tx = await fundingTxFetcher.$fetchChannelOpenTx(short_id);
       if (!tx) {
-        logger.err(`Unable to fetch funding tx for channel ${short_id}. Capacity and creation date is unknown. Skipping channel.`);
+        logger.err(`${logger.tags.ln} Unable to fetch funding tx for channel ${short_id}. Capacity and creation date is unknown. Skipping channel.`);
         continue;
       }
 
@@ -243,7 +243,7 @@ class LightningStatsImporter {
       try {
         fileList = await fsPromises.readdir(this.topologiesFolder);
       } catch (e) {
-        logger.err(`Unable to open topology folder at ${this.topologiesFolder}`);
+        logger.err(`${logger.tags.ln} Unable to open topology folder at ${this.topologiesFolder}`);
         throw e;
       }
       // Insert history from the most recent to the oldest
@@ -281,7 +281,7 @@ class LightningStatsImporter {
           continue;
         }
 
-        logger.debug(`Reading ${this.topologiesFolder}/${filename}`);
+        logger.debug(`${logger.tags.ln} Reading ${this.topologiesFolder}/${filename}`);
         let fileContent = '';
         try {
           fileContent = await fsPromises.readFile(`${this.topologiesFolder}/${filename}`, 'utf8');
@@ -289,7 +289,7 @@ class LightningStatsImporter {
           if (e.errno == -1) { // EISDIR - Ignore directorie
             continue;
           }
-          logger.err(`Unable to open ${this.topologiesFolder}/${filename}`);
+          logger.err(`${logger.tags.ln} Unable to open ${this.topologiesFolder}/${filename}`);
           continue;
         }
 
@@ -298,25 +298,25 @@ class LightningStatsImporter {
           graph = JSON.parse(fileContent);
           graph = await this.cleanupTopology(graph);
         } catch (e) {
-          logger.debug(`Invalid topology file ${this.topologiesFolder}/${filename}, cannot parse the content`);
+          logger.debug(`${logger.tags.ln} Invalid topology file ${this.topologiesFolder}/${filename}, cannot parse the content`);
           continue;
         }
     
         if (!logStarted) {
-          logger.info(`Founds a topology file that we did not import. Importing historical lightning stats now.`);
+          logger.info(`${logger.tags.ln} Founds a topology file that we did not import. Importing historical lightning stats now.`);
           logStarted = true;
         }
         
         const datestr = `${new Date(timestamp * 1000).toUTCString()} (${timestamp})`;
-        logger.debug(`${datestr}: Found ${graph.nodes.length} nodes and ${graph.edges.length} channels`);
+        logger.debug(`${logger.tags.ln} ${datestr}: Found ${graph.nodes.length} nodes and ${graph.edges.length} channels`);
 
         totalProcessed++;
 
         if (processed > 10) {
-          logger.info(`Generating LN network stats for ${datestr}. Processed ${totalProcessed}/${fileList.length} files`);
+          logger.info(`${logger.tags.ln} Generating LN network stats for ${datestr}. Processed ${totalProcessed}/${fileList.length} files`);
           processed = 0;
         } else {
-          logger.debug(`Generating LN network stats for ${datestr}. Processed ${totalProcessed}/${fileList.length} files`);
+          logger.debug(`${logger.tags.ln} Generating LN network stats for ${datestr}. Processed ${totalProcessed}/${fileList.length} files`);
         }
         await fundingTxFetcher.$fetchChannelsFundingTxs(graph.edges.map(channel => channel.channel_id.slice(0, -2)));
         const stat = await this.computeNetworkStats(timestamp, graph);
@@ -325,10 +325,10 @@ class LightningStatsImporter {
       }
 
       if (totalProcessed > 0) {
-        logger.info(`Lightning network stats historical import completed`);
+        logger.notice(`${logger.tags.ln} Lightning network stats historical import completed`);
       }
     } catch (e) {
-      logger.err(`Lightning network stats historical failed. Reason: ${e instanceof Error ? e.message : e}`);
+      logger.err(`${logger.tags.ln} Lightning network stats historical failed. Reason: ${e instanceof Error ? e.message : e}`);
     }
   }
 

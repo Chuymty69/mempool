@@ -32,6 +32,11 @@ class Logger {
     local7: 23
   };
 
+  public tags = {
+    mining: '[Mining]',
+    ln: '[Lightning]',
+  };  
+
   // @ts-ignore
   public emerg: ((msg: string) => void);
   // @ts-ignore

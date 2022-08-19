@@ -21,10 +21,10 @@ class FundingTxFetcher {
       try {
         this.fundingTxCache = JSON.parse(await fsPromises.readFile(CACHE_FILE_NAME, 'utf-8'));
       } catch (e) {
-        logger.err(`Unable to parse channels funding txs disk cache. Starting from scratch`);
+        logger.err(`${logger.tags.ln} Unable to parse channels funding txs disk cache. Starting from scratch`);
         this.fundingTxCache = {};
       }
-      logger.debug(`Imported ${Object.keys(this.fundingTxCache).length} funding tx amount from the disk cache`);
+      logger.debug(`${logger.tags.ln} Imported ${Object.keys(this.fundingTxCache).length} funding tx amount from the disk cache`);
     }
   }
 
@@ -44,9 +44,9 @@ class FundingTxFetcher {
       ++channelProcessed;
 
       let elapsedSeconds = Math.round((new Date().getTime() / 1000) - loggerTimer);
-      if (elapsedSeconds > 10) {
+      if (elapsedSeconds > config.LIGHTNING.LOGGER_UPDATE_INTERVAL) {
         elapsedSeconds = Math.round((new Date().getTime() / 1000) - globalTimer);
-        logger.info(`Indexing channels funding tx ${channelProcessed + 1} of ${channelIds.length} ` +
+        logger.info(`${logger.tags.ln} Indexing channels funding tx ${channelProcessed + 1} of ${channelIds.length} ` +
           `(${Math.floor(channelProcessed / channelIds.length * 10000) / 100}%) | ` +
           `elapsed: ${elapsedSeconds} seconds`
         );
@@ -55,15 +55,15 @@ class FundingTxFetcher {
 
       elapsedSeconds = Math.round((new Date().getTime() / 1000) - cacheTimer);
       if (elapsedSeconds > 60) {
-        logger.debug(`Saving ${Object.keys(this.fundingTxCache).length} funding txs cache into disk`);
+        logger.debug(`${logger.tags.ln} Saving ${Object.keys(this.fundingTxCache).length} funding txs cache into disk`);
         fsPromises.writeFile(CACHE_FILE_NAME, JSON.stringify(this.fundingTxCache));
         cacheTimer = new Date().getTime() / 1000;
       }
     }
 
     if (this.channelNewlyProcessed > 0) {
-      logger.info(`Indexed ${this.channelNewlyProcessed} additional channels funding tx`);
-      logger.debug(`Saving ${Object.keys(this.fundingTxCache).length} funding txs cache into disk`);
+      logger.info(`${logger.tags.ln} Indexed ${this.channelNewlyProcessed} additional channels funding tx`);
+      logger.debug(`${logger.tags.ln} Saving ${Object.keys(this.fundingTxCache).length} funding txs cache into disk`);
       fsPromises.writeFile(CACHE_FILE_NAME, JSON.stringify(this.fundingTxCache));
     }
 

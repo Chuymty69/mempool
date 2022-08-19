@@ -9,7 +9,7 @@ export async function $lookupNodeLocation(): Promise<void> {
   let loggerTimer = new Date().getTime() / 1000;
   let progress = 0;
 
-  logger.info(`Running node location updater using Maxmind`);
+  logger.debug(`${logger.tags.ln} Running node location updater using Maxmind`);
   try {
     const nodes = await nodesApi.$getAllNodes();
     const lookupCity = await maxmind.open<CityResponse>(config.MAXMIND.GEOLITE2_CITY);
@@ -97,14 +97,14 @@ export async function $lookupNodeLocation(): Promise<void> {
 
           ++progress;
           const elapsedSeconds = Math.round((new Date().getTime() / 1000) - loggerTimer);
-          if (elapsedSeconds > 10) {
+          if (elapsedSeconds > config.LIGHTNING.LOGGER_UPDATE_INTERVAL) {
             logger.info(`Updating node location data ${progress}/${nodes.length}`);
             loggerTimer = new Date().getTime() / 1000;
           }
         }
       }
     }
-    logger.info(`${progress} nodes location data updated`);
+    logger.debug(`${logger.tags.ln} ${progress} nodes location data updated`);
   } catch (e) {
     logger.err('$lookupNodeLocation() error: ' + (e instanceof Error ? e.message : e));
   }

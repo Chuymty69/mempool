@@ -6,7 +6,7 @@ import { Common } from '../../api/common';
 
 class LightningStatsUpdater {
   public async $startService(): Promise<void> {
-    logger.info('Starting Lightning Stats service');
+    logger.info(`${logger.tags.ln} Starting Lightning Stats service`);
 
     await this.$runTasks();
     LightningStatsImporter.$run();
@@ -27,7 +27,7 @@ class LightningStatsUpdater {
     const networkGraph = await lightningApi.$getNetworkGraph();
     await LightningStatsImporter.computeNetworkStats(date.getTime() / 1000, networkGraph);
     
-    logger.info(`Updated latest network stats`);
+    logger.debug(`${logger.tags.ln} Updated latest network stats`);
   }
 }
 

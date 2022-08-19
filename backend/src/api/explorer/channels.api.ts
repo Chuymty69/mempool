@@ -454,9 +454,9 @@ class ChannelsApi {
         AND status != 2
       `);
       if (result[0].changedRows ?? 0 > 0) {
-        logger.info(`Marked ${result[0].changedRows} channels as inactive because they are not in the graph`);
+        logger.info(`${logger.tags.ln} Marked ${result[0].changedRows} channels as inactive because they are not in the graph`);
       } else {
-        logger.debug(`Marked ${result[0].changedRows} channels as inactive because they are not in the graph`);
+        logger.debug(`${logger.tags.ln} Marked ${result[0].changedRows} channels as inactive because they are not in the graph`);
       }
     } catch (e) {
       logger.err('$setChannelsInactive() error: ' + (e instanceof Error ? e.message : e));

@@ -1,5 +1,4 @@
 import * as fs from 'fs';
-import { Common } from '../api/common';
 import config from '../config';
 import logger from '../logger';
 import PricesRepository from '../repositories/PricesRepository';
@@ -177,9 +176,9 @@ class PriceUpdater {
       ++insertedCount;
     }
     if (insertedCount > 0) {
-      logger.notice(`Inserted ${insertedCount} MtGox USD weekly price history into db`);
+      logger.notice(`${logger.tags.mining} Inserted ${insertedCount} MtGox USD weekly price history into db`);
     } else {
-      logger.debug(`Inserted ${insertedCount} MtGox USD weekly price history into db`);
+      logger.debug(`${logger.tags.mining} Inserted ${insertedCount} MtGox USD weekly price history into db`);
     }
 
     // Insert Kraken weekly prices
@@ -200,7 +199,7 @@ class PriceUpdater {
   private async $insertMissingRecentPrices(type: 'hour' | 'day'): Promise<void> {
     const existingPriceTimes = await PricesRepository.$getPricesTimes();
 
-    logger.info(`Fetching ${type === 'day' ? 'dai' : 'hour'}ly price history from exchanges and saving missing ones into the database, this may take a while`);
+    logger.info(`Fetching ${type === 'day' ? 'dai' : 'hour'}ly price history from exchanges and saving missing ones into the database`);
 
     const historicalPrices: PriceHistory[] = [];
 

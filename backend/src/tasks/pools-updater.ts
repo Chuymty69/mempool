@@ -32,9 +32,9 @@ class PoolsUpdater {
     this.lastRun = now;
 
     if (config.SOCKS5PROXY.ENABLED) {
-      logger.info(`Updating latest mining pools from ${this.poolsUrl} over the Tor network`);
+      logger.info(`${logger.tags.mining} Updating latest mining pools from ${this.poolsUrl} over the Tor network`);
     } else {
-      logger.info(`Updating latest mining pools from ${this.poolsUrl} over clearnet`);
+      logger.info(`${logger.tags.mining} Updating latest mining pools from ${this.poolsUrl} over clearnet`);
     }
 
     try {
@@ -63,11 +63,11 @@ class PoolsUpdater {
       }
       await poolsParser.migratePoolsJson(poolsJson);
       await this.updateDBSha(githubSha);
-      logger.notice('PoolsUpdater completed');
+      logger.notice('${logger.tags.mining} PoolsUpdater completed');
 
     } catch (e) {
       this.lastRun = now - (oneWeek - oneDay); // Try again in 24h instead of waiting next week
-      logger.err('PoolsUpdater failed. Will try again in 24h. Reason: ' + (e instanceof Error ? e.message : e));
+      logger.err('${logger.tags.mining} PoolsUpdater failed. Will try again in 24h. Reason: ' + (e instanceof Error ? e.message : e));
     }
   }
 
