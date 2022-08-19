@@ -27,7 +27,7 @@ export function convertNode(clNode: any): ILightningApi.Node {
  * Convert clightning "listchannels" response to lnd "describegraph.edges" format
  */
 export async function convertAndmergeBidirectionalChannels(clChannels: any[]): Promise<ILightningApi.Channel[]> {
-  logger.debug('${logger.tags.ln} Converting clightning nodes and channels to lnd graph format');
+  logger.debug(`${logger.tags.ln} Converting clightning nodes and channels to lnd graph format`);
 
   let loggerTimer = new Date().getTime() / 1000;
   let channelProcessed = 0;
