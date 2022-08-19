@@ -63,11 +63,11 @@ class PoolsUpdater {
       }
       await poolsParser.migratePoolsJson(poolsJson);
       await this.updateDBSha(githubSha);
-      logger.notice('${logger.tags.mining} PoolsUpdater completed');
+      logger.notice(`${logger.tags.mining} PoolsUpdater completed`);
 
     } catch (e) {
       this.lastRun = now - (oneWeek - oneDay); // Try again in 24h instead of waiting next week
-      logger.err('${logger.tags.mining} PoolsUpdater failed. Will try again in 24h. Reason: ' + (e instanceof Error ? e.message : e));
+      logger.err(`${logger.tags.mining} PoolsUpdater failed. Will try again in 24h. Reason: ${e instanceof Error ? e.message : e}`);
     }
   }
 
