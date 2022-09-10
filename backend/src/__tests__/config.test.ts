@@ -137,5 +137,4 @@ describe('Mempool Backend Config', () => {
       expect(config.EXTERNAL_DATA_SERVER).toStrictEqual(fixture.EXTERNAL_DATA_SERVER);
     });
   });
-
 });

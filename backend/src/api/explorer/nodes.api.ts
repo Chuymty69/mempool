@@ -5,6 +5,49 @@ import { ILightningApi } from '../lightning/lightning-api.interface';
 import { ITopNodesPerCapacity, ITopNodesPerChannels } from '../../mempool.interfaces';
 
 class NodesApi {
+  public async $getWorldNodes(): Promise<any> {
+    try {
+      let query = `
+        SELECT nodes.public_key as publicKey, IF(nodes.alias = '', SUBSTRING(nodes.public_key, 1, 20), alias) as alias,
+        CAST(COALESCE(nodes.capacity, 0) as INT) as capacity,
+        CAST(COALESCE(nodes.channels, 0) as INT) as channels,
+        nodes.longitude, nodes.latitude,
+        geo_names_country.names as country, geo_names_iso.names as isoCode
+        FROM nodes
+        LEFT JOIN geo_names geo_names_country ON geo_names_country.id = nodes.country_id AND geo_names_country.type = 'country'
+        LEFT JOIN geo_names geo_names_iso ON geo_names_iso.id = nodes.country_id AND geo_names_iso.type = 'country_iso_code'
+        WHERE status = 1 AND nodes.as_number IS NOT NULL
+        ORDER BY capacity
+      `;
+
+      const [nodes]: any[] = await DB.query(query);
+
+      for (let i = 0; i < nodes.length; ++i) {
+        nodes[i].country = JSON.parse(nodes[i].country);
+      }
+
+      query = `
+        SELECT MAX(nodes.capacity) as maxLiquidity, MAX(nodes.channels) as maxChannels
+        FROM nodes
+        WHERE status = 1 AND nodes.as_number IS NOT NULL
+      `;
+
+      const [maximums]: any[] = await DB.query(query);
+      
+      return {
+        maxLiquidity: maximums[0].maxLiquidity,
+        maxChannels: maximums[0].maxChannels,
+        nodes: nodes.map(node => [
+          node.longitude, node.latitude,
+          node.publicKey, node.alias, node.capacity, node.channels,
+          node.country, node.isoCode
+        ])
+      };
+    } catch (e) {
+      logger.err(`Can't get world nodes list. Reason: ${e instanceof Error ? e.message : e}`);
+    }
+  }
+
   public async $getNode(public_key: string): Promise<any> {
     try {
       // General info
@@ -115,17 +158,13 @@ class NodesApi {
 
   public async $getTopCapacityNodes(full: boolean): Promise<ITopNodesPerCapacity[]> {
     try {
-      let [rows]: any[] = await DB.query('SELECT UNIX_TIMESTAMP(MAX(added)) as maxAdded FROM node_stats');
-      const latestDate = rows[0].maxAdded;
-
+      let rows: any;
       let query: string;
       if (full === false) {
         query = `
           SELECT nodes.public_key AS publicKey, IF(nodes.alias = '', SUBSTRING(nodes.public_key, 1, 20), alias) as alias,
-            node_stats.capacity
-          FROM node_stats
-          JOIN nodes ON nodes.public_key = node_stats.public_key
-          WHERE added = FROM_UNIXTIME(${latestDate})
+            nodes.capacity
+          FROM nodes
           ORDER BY capacity DESC
           LIMIT 100
         `;
@@ -133,16 +172,17 @@ class NodesApi {
         [rows] = await DB.query(query);
       } else {
         query = `
-          SELECT node_stats.public_key AS publicKey, IF(nodes.alias = '', SUBSTRING(node_stats.public_key, 1, 20), alias) as alias,
-            CAST(COALESCE(node_stats.capacity, 0) as INT) as capacity,
-            CAST(COALESCE(node_stats.channels, 0) as INT) as channels,
+          SELECT nodes.public_key AS publicKey, IF(nodes.alias = '', SUBSTRING(nodes.public_key, 1, 20), alias) as alias,
+            CAST(COALESCE(nodes.capacity, 0) as INT) as capacity,
+            CAST(COALESCE(nodes.channels, 0) as INT) as channels,
             UNIX_TIMESTAMP(nodes.first_seen) as firstSeen, UNIX_TIMESTAMP(nodes.updated_at) as updatedAt,
-            geo_names_city.names as city, geo_names_country.names as country
-          FROM node_stats
-          RIGHT JOIN nodes ON nodes.public_key = node_stats.public_key
+            geo_names_city.names as city, geo_names_country.names as country,
+            geo_names_iso.names as iso_code, geo_names_subdivision.names as subdivision
+          FROM nodes
           LEFT JOIN geo_names geo_names_country ON geo_names_country.id = nodes.country_id AND geo_names_country.type = 'country'
           LEFT JOIN geo_names geo_names_city ON geo_names_city.id = nodes.city_id AND geo_names_city.type = 'city'
-          WHERE added = FROM_UNIXTIME(${latestDate})
+          LEFT JOIN geo_names geo_names_iso ON geo_names_iso.id = nodes.country_id AND geo_names_iso.type = 'country_iso_code'
+          LEFT JOIN geo_names geo_names_subdivision on geo_names_subdivision.id = nodes.subdivision_id AND geo_names_subdivision.type = 'division'
           ORDER BY capacity DESC
           LIMIT 100
         `;
@@ -163,17 +203,13 @@ class NodesApi {
 
   public async $getTopChannelsNodes(full: boolean): Promise<ITopNodesPerChannels[]> {
     try {
-      let [rows]: any[] = await DB.query('SELECT UNIX_TIMESTAMP(MAX(added)) as maxAdded FROM node_stats');
-      const latestDate = rows[0].maxAdded;
-
+      let rows: any;
       let query: string;
       if (full === false) {
         query = `
           SELECT nodes.public_key as publicKey, IF(nodes.alias = '', SUBSTRING(nodes.public_key, 1, 20), alias) as alias,
-            node_stats.channels
-          FROM node_stats
-          JOIN nodes ON nodes.public_key = node_stats.public_key
-          WHERE added = FROM_UNIXTIME(${latestDate})
+            nodes.channels
+          FROM nodes
           ORDER BY channels DESC
           LIMIT 100;
         `;
@@ -181,16 +217,17 @@ class NodesApi {
         [rows] = await DB.query(query);
       } else {
         query = `
-          SELECT node_stats.public_key AS publicKey, IF(nodes.alias = '', SUBSTRING(node_stats.public_key, 1, 20), alias) as alias,
-            CAST(COALESCE(node_stats.channels, 0) as INT) as channels,
-            CAST(COALESCE(node_stats.capacity, 0) as INT) as capacity,
+          SELECT nodes.public_key AS publicKey, IF(nodes.alias = '', SUBSTRING(nodes.public_key, 1, 20), alias) as alias,
+            CAST(COALESCE(nodes.channels, 0) as INT) as channels,
+            CAST(COALESCE(nodes.capacity, 0) as INT) as capacity,
             UNIX_TIMESTAMP(nodes.first_seen) as firstSeen, UNIX_TIMESTAMP(nodes.updated_at) as updatedAt,
-            geo_names_city.names as city, geo_names_country.names as country
-          FROM node_stats
-          RIGHT JOIN nodes ON nodes.public_key = node_stats.public_key
+            geo_names_city.names as city, geo_names_country.names as country,
+            geo_names_iso.names as iso_code, geo_names_subdivision.names as subdivision
+          FROM nodes
           LEFT JOIN geo_names geo_names_country ON geo_names_country.id = nodes.country_id AND geo_names_country.type = 'country'
           LEFT JOIN geo_names geo_names_city ON geo_names_city.id = nodes.city_id AND geo_names_city.type = 'city'
-          WHERE added = FROM_UNIXTIME(${latestDate})
+          LEFT JOIN geo_names geo_names_iso ON geo_names_iso.id = nodes.country_id AND geo_names_iso.type = 'country_iso_code'
+          LEFT JOIN geo_names geo_names_subdivision on geo_names_subdivision.id = nodes.subdivision_id AND geo_names_subdivision.type = 'division'
           ORDER BY channels DESC
           LIMIT 100
         `;
@@ -233,11 +270,14 @@ class NodesApi {
             CAST(COALESCE(node_stats.channels, 0) as INT) as channels,
             CAST(COALESCE(node_stats.capacity, 0) as INT) as capacity,
             UNIX_TIMESTAMP(nodes.first_seen) as firstSeen, UNIX_TIMESTAMP(nodes.updated_at) as updatedAt,
-            geo_names_city.names as city, geo_names_country.names as country
+            geo_names_city.names as city, geo_names_country.names as country,
+            geo_names_iso.names as iso_code, geo_names_subdivision.names as subdivision
           FROM node_stats
           RIGHT JOIN nodes ON nodes.public_key = node_stats.public_key
           LEFT JOIN geo_names geo_names_country ON geo_names_country.id = nodes.country_id AND geo_names_country.type = 'country'
           LEFT JOIN geo_names geo_names_city ON geo_names_city.id = nodes.city_id AND geo_names_city.type = 'city'
+          LEFT JOIN geo_names geo_names_iso ON geo_names_iso.id = nodes.country_id AND geo_names_iso.type = 'country_iso_code'
+          LEFT JOIN geo_names geo_names_subdivision on geo_names_subdivision.id = nodes.subdivision_id AND geo_names_subdivision.type = 'division'
           WHERE added = FROM_UNIXTIME(${latestDate})
           ORDER BY first_seen
           LIMIT 100
@@ -260,8 +300,8 @@ class NodesApi {
   public async $searchNodeByPublicKeyOrAlias(search: string) {
     try {
       const publicKeySearch = search.replace('%', '') + '%';
-      const aliasSearch = search.replace(/[-_.]/g, ' ').replace(/[^a-zA-Z ]/g, '').split(' ').map((search) => '+' + search + '*').join(' ');
-      const query = `SELECT nodes.public_key, nodes.alias, node_stats.capacity FROM nodes LEFT JOIN node_stats ON node_stats.public_key = nodes.public_key WHERE nodes.public_key LIKE ? OR MATCH nodes.alias_search AGAINST (? IN BOOLEAN MODE) GROUP BY nodes.public_key ORDER BY node_stats.capacity DESC LIMIT 10`;
+      const aliasSearch = search.replace(/[-_.]/g, ' ').replace(/[^a-zA-Z0-9 ]/g, '').split(' ').map((search) => '+' + search + '*').join(' ');
+      const query = `SELECT public_key, alias, capacity, channels, status FROM nodes WHERE public_key LIKE ? OR MATCH alias_search AGAINST (? IN BOOLEAN MODE) ORDER BY capacity DESC LIMIT 10`;
       const [rows]: any = await DB.query(query, [publicKeySearch, aliasSearch]);
       return rows;
     } catch (e) {
@@ -276,7 +316,7 @@ class NodesApi {
 
       // List all channels and the two linked ISP
       query = `
-        SELECT short_id, capacity,
+        SELECT short_id, channels.capacity,
           channels.node1_public_key AS node1PublicKey, isp1.names AS isp1, isp1.id as isp1ID,
           channels.node2_public_key AS node2PublicKey, isp2.names AS isp2, isp2.id as isp2ID
         FROM channels
@@ -391,21 +431,17 @@ class NodesApi {
   public async $getNodesPerCountry(countryId: string) {
     try {
       const query = `
-        SELECT nodes.public_key, CAST(COALESCE(node_stats.capacity, 0) as INT) as capacity, CAST(COALESCE(node_stats.channels, 0) as INT) as channels,
+        SELECT nodes.public_key, CAST(COALESCE(nodes.capacity, 0) as INT) as capacity, CAST(COALESCE(nodes.channels, 0) as INT) as channels,
           nodes.alias, UNIX_TIMESTAMP(nodes.first_seen) as first_seen, UNIX_TIMESTAMP(nodes.updated_at) as updated_at,
           geo_names_city.names as city, geo_names_country.names as country,
-          geo_names_iso.names as iso_code, geo_names_subdivision.names as subdivision
-        FROM node_stats
-        JOIN (
-          SELECT public_key, MAX(added) as last_added
-          FROM node_stats
-          GROUP BY public_key
-        ) as b ON b.public_key = node_stats.public_key AND b.last_added = node_stats.added
-        RIGHT JOIN nodes ON nodes.public_key = node_stats.public_key
+          geo_names_iso.names as iso_code, geo_names_subdivision.names as subdivision,
+          nodes.longitude, nodes.latitude, nodes.as_number, geo_names_isp.names as isp
+        FROM nodes
         LEFT JOIN geo_names geo_names_country ON geo_names_country.id = nodes.country_id AND geo_names_country.type = 'country'
         LEFT JOIN geo_names geo_names_city ON geo_names_city.id = nodes.city_id AND geo_names_city.type = 'city'
         LEFT JOIN geo_names geo_names_iso ON geo_names_iso.id = nodes.country_id AND geo_names_iso.type = 'country_iso_code'
         LEFT JOIN geo_names geo_names_subdivision on geo_names_subdivision.id = nodes.subdivision_id AND geo_names_subdivision.type = 'division'
+        LEFT JOIN geo_names geo_names_isp on geo_names_isp.id = nodes.as_number AND geo_names_isp.type = 'as_organization'
         WHERE geo_names_country.id = ?
         ORDER BY capacity DESC
       `;
@@ -415,6 +451,7 @@ class NodesApi {
         rows[i].country = JSON.parse(rows[i].country);
         rows[i].city = JSON.parse(rows[i].city);
         rows[i].subdivision = JSON.parse(rows[i].subdivision);
+        rows[i].isp = JSON.parse(rows[i].isp);
       }
       return rows;
     } catch (e) {
@@ -426,17 +463,12 @@ class NodesApi {
   public async $getNodesPerISP(ISPId: string) {
     try {
       const query = `
-        SELECT nodes.public_key, CAST(COALESCE(node_stats.capacity, 0) as INT) as capacity, CAST(COALESCE(node_stats.channels, 0) as INT) as channels,
+        SELECT nodes.public_key, CAST(COALESCE(nodes.capacity, 0) as INT) as capacity, CAST(COALESCE(nodes.channels, 0) as INT) as channels,
           nodes.alias, UNIX_TIMESTAMP(nodes.first_seen) as first_seen, UNIX_TIMESTAMP(nodes.updated_at) as updated_at,
           geo_names_city.names as city, geo_names_country.names as country,
-          geo_names_iso.names as iso_code, geo_names_subdivision.names as subdivision
-        FROM node_stats
-        JOIN (
-          SELECT public_key, MAX(added) as last_added
-          FROM node_stats
-          GROUP BY public_key
-        ) as b ON b.public_key = node_stats.public_key AND b.last_added = node_stats.added
-        RIGHT JOIN nodes ON nodes.public_key = node_stats.public_key
+          geo_names_iso.names as iso_code, geo_names_subdivision.names as subdivision,
+          nodes.longitude, nodes.latitude
+        FROM nodes
         LEFT JOIN geo_names geo_names_country ON geo_names_country.id = nodes.country_id AND geo_names_country.type = 'country'
         LEFT JOIN geo_names geo_names_city ON geo_names_city.id = nodes.city_id AND geo_names_city.type = 'city'
         LEFT JOIN geo_names geo_names_iso ON geo_names_iso.id = nodes.country_id AND geo_names_iso.type = 'country_iso_code'
@@ -464,7 +496,6 @@ class NodesApi {
         FROM nodes
         JOIN geo_names ON geo_names.id = nodes.country_id AND geo_names.type = 'country'
         JOIN geo_names geo_names_iso ON geo_names_iso.id = nodes.country_id AND geo_names_iso.type = 'country_iso_code'
-        JOIN channels ON channels.node1_public_key = nodes.public_key OR channels.node2_public_key = nodes.public_key
         GROUP BY country_id
         ORDER BY COUNT(DISTINCT nodes.public_key) DESC
       `;
@@ -529,6 +560,18 @@ class NodesApi {
   }
 
   /**
+   * Update node sockets
+   */
+  public async $updateNodeSockets(publicKey: string, sockets: {network: string; addr: string}[]): Promise<void> {
+    const formattedSockets = (sockets.map(a => a.addr).join(',')) ?? '';
+    try {
+      await DB.query(`UPDATE nodes SET sockets = ? WHERE public_key = ?`, [formattedSockets, publicKey]);
+    } catch (e) {
+      logger.err(`Cannot update node sockets for ${publicKey}. Reason: ${e instanceof Error ? e.message : e}`);
+    }
+  }
+
+  /**
    * Set all nodes not in `nodesPubkeys` as inactive (status = 0)
    */
    public async $setNodesInactive(graphNodesPubkeys: string[]): Promise<void> {
@@ -555,7 +598,7 @@ class NodesApi {
   }
 
   private aliasToSearchText(str: string): string {
-    return str.replace(/[-_.]/g, ' ').replace(/[^a-zA-Z ]/g, '');
+    return str.replace(/[-_.]/g, ' ').replace(/[^a-zA-Z0-9 ]/g, '');
   }
 }
 
